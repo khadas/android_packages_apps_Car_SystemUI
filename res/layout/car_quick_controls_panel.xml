@@ -176,6 +176,7 @@
                     android:id="@+id/logout_button"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
+                    android:visibility="gone"
                     app:layout_constraintHorizontal_weight="2"
                     app:layout_constraintStart_toEndOf="@id/settings_button"
                     app:layout_constraintEnd_toStartOf="@+id/screen_off_button"

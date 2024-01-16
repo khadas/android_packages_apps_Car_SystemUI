@@ -18,6 +18,7 @@ package com.android.systemui.car;
 
 import android.annotation.NonNull;
 import android.car.settings.CarSettings;
+import android.content.pm.UserInfo;
 import android.database.ContentObserver;
 import android.net.Uri;
 import android.os.Handler;
@@ -119,5 +120,14 @@ public class CarDeviceProvisionedControllerImpl extends DeviceProvisionedControl
             }
             return Unit.INSTANCE;
         });
+    }
+
+    @Override
+    public boolean isCurrentUserSetup() {
+        UserInfo currentUserInfo = mUserTracker.getUserInfo();
+        if (currentUserInfo.isManagedProfile()) {
+            return true;
+        }
+        return super.isCurrentUserSetup();
     }
 }

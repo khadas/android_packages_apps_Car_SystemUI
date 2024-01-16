@@ -17,7 +17,9 @@
 package com.android.systemui.car.systembar;
 
 import android.content.Context;
+import android.content.om.OverlayInfo;
 import android.content.om.OverlayManager;
+import android.content.res.ApkAssets;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.UserHandle;
@@ -27,6 +29,8 @@ import com.android.systemui.CoreStartable;
 import com.android.systemui.R;
 import com.android.systemui.car.users.CarSystemUIUserUtil;
 import com.android.systemui.settings.UserTracker;
+
+import java.util.List;
 
 import javax.inject.Inject;
 
@@ -51,6 +55,7 @@ public class CarSystemBarMediator implements CoreStartable {
     private static final String TAG = CarSystemBarMediator.class.getSimpleName();
     private boolean mCarSystemBarStarted = false;
     private final Context mContext;
+    private String rroPackageName;
 
     @Inject
     public CarSystemBarMediator(CarSystemBar carSystemBar, SystemBarConfigs systemBarConfigs,
@@ -66,7 +71,7 @@ public class CarSystemBarMediator implements CoreStartable {
 
     @Override
     public void start() {
-        String rroPackageName = mContext.getString(
+        rroPackageName = mContext.getString(
                 R.string.config_secondaryUserSystemUIRROPackageName);
         if (DEBUG) {
             Log.d(TAG, "start(), toggle RRO package:" + rroPackageName);
@@ -88,11 +93,28 @@ public class CarSystemBarMediator implements CoreStartable {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         if (DEBUG) {
-            Log.d(TAG, "onConfigurationChanged(), reset resources and start CarSystemBar");
+            Log.d(TAG, "onConfigurationChanged(), reset resources and start CarSystemBar newConfig = " + newConfig.toString());
+        }
+        OverlayInfo overlayInfo = mOverlayManager.getOverlayInfo(rroPackageName, mUserTracker.getUserHandle());
+        if (!overlayInfo.isEnabled()) {
+            Log.d(TAG, "overlay(" + overlayInfo.getOverlayIdentifier().toString() + ") is no enabled!");
+            return;
+        }
+        boolean overlayEnableSuccess = false;
+        for (ApkAssets apkAssets : mContext.getResources().getAssets().getApkAssets()) {
+            Log.d(TAG, "apkAssets = " + apkAssets.getAssetPath());
+            if (overlayInfo.getBaseCodePath().contains(apkAssets.getAssetPath())) {
+                overlayEnableSuccess = true;
+            }
+        }
+        if (!overlayEnableSuccess) {
+            Log.d(TAG, "overlay(" + overlayInfo.getOverlayIdentifier().toString() + ") is no enabled successful!");
+            return;
         }
         // Do not start any components which depend on the overlaid resources before RROs gets
         // applied.
         if (mCarSystemBarStarted) {
+            Log.d(TAG, "onConfigurationChanged mCarSystemBarStarted is true, return!!!");
             return;
         }
         mSystemBarConfigs.resetSystemBarConfigs();
