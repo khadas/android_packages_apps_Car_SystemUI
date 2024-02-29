@@ -158,7 +158,7 @@ public class CarSystemBarView extends LinearLayout {
 
     void updateControlCenterButtonVisibility(boolean isMumd) {
         if (mControlCenterButton != null) {
-            mControlCenterButton.setVisibility(isMumd ? VISIBLE : GONE);
+            mControlCenterButton.setVisibility(isMumd ? GONE : GONE);
         }
     }
 
