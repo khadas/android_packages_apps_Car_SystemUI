@@ -379,6 +379,10 @@ public final class DisplayInputSinkController implements CoreStartable {
 
     @VisibleForTesting
     void mayStopDisplayInputLock(Display display) {
+        if (display == null) {
+            if (DBG) Slog.d(TAG, "This Display is null, return!");
+            return;
+        }
         int displayId = display.getDisplayId();
         if (!isDisplayInputLockStarted(displayId)) {
             if (DBG) Slog.d(TAG, "There is no input lock started for display#" + displayId);

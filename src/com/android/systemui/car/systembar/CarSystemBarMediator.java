@@ -21,9 +21,13 @@ import android.content.om.OverlayInfo;
 import android.content.om.OverlayManager;
 import android.content.res.ApkAssets;
 import android.content.res.Configuration;
+import android.hardware.display.DisplayManager;
+import android.hardware.display.DisplayManager.DisplayListener;
 import android.os.Build;
+import android.os.Handler;
 import android.os.UserHandle;
 import android.util.Log;
+import android.view.Display;
 
 import com.android.systemui.CoreStartable;
 import com.android.systemui.R;
@@ -56,6 +60,37 @@ public class CarSystemBarMediator implements CoreStartable {
     private boolean mCarSystemBarStarted = false;
     private final Context mContext;
     private String rroPackageName;
+    private DisplayManager mDisplayManager;
+    private int mDisplayId = Display.INVALID_DISPLAY;
+
+    private final DisplayListener mDisplayListener = new DisplayListener() {
+        @Override
+        public void onDisplayAdded(int displayId) {
+            if (mDisplayId == Display.INVALID_DISPLAY) {
+                if (DEBUG) {
+                    Log.d(TAG, "CarSystemBarMediator onDisplayAdded(" + displayId + "), reset SystemBar!");
+                }
+                mSystemBarConfigs.resetSystemBarConfigs();
+                mCarSystemBarController.resetSystemBarConfigs();
+                mCarSystemBar.start();
+            }
+        }
+
+        @Override
+        public void onDisplayRemoved(int displayId) {
+            if (mDisplayId == displayId) {
+                if (DEBUG) {
+                    Log.d(TAG, "mDisplayId = " + mDisplayId + " is remove! This SystemUI set INVALID_DISPLAY");
+                }
+                mDisplayId = Display.INVALID_DISPLAY;
+            }
+        }
+
+        @Override
+        public void onDisplayChanged(int displayId) {
+
+        }
+    };
 
     @Inject
     public CarSystemBarMediator(CarSystemBar carSystemBar, SystemBarConfigs systemBarConfigs,
@@ -65,6 +100,9 @@ public class CarSystemBarMediator implements CoreStartable {
         mSystemBarConfigs = systemBarConfigs;
         mCarSystemBarController = carSystemBarController;
         mOverlayManager = context.getSystemService(OverlayManager.class);
+        mDisplayManager = context.getSystemService(DisplayManager.class);
+        mDisplayManager.registerDisplayListener(mDisplayListener, new Handler());
+        mDisplayId = context.getDisplayId();
         mUserTracker = userTracker;
         mContext = context;
     }
