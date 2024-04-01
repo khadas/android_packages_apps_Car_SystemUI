@@ -193,6 +193,7 @@ public class CarSystemBarViewFactory {
     protected void resetCache() {
         mQuickControlsEntryPointsController.resetCache();
         mReadOnlyIconsController.resetCache();
+        mCachedContainerMap.clear();
         mCachedViewMap.clear();
     }
 }

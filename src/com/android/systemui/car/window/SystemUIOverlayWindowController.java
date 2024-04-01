@@ -22,6 +22,7 @@ import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_M
 import android.content.Context;
 import android.graphics.PixelFormat;
 import android.os.Binder;
+import android.view.Display;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -29,8 +30,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowManager;
-
+import android.util.Log;
+import com.android.systemui.CarSystemUIApplication;
 import com.android.systemui.R;
+import com.android.systemui.car.users.CarSystemUIUserUtil;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 
@@ -72,6 +75,7 @@ public class SystemUIOverlayWindowController implements
             Context context,
             WindowManager windowManager,
             ConfigurationController configurationController) {
+        Log.i("SystemUIOverlayWindowController", "inject displayId = " + context.getDisplayId());
         mContext = context;
         mWindowManager = windowManager;
 
@@ -106,6 +110,12 @@ public class SystemUIOverlayWindowController implements
 
     /** Attaches the window to the window manager. */
     public void attach() {
+        int applicantDisplayId = ((CarSystemUIApplication) mContext.getApplicationContext()).getMyOccupantZoneDisplayId();
+        if (CarSystemUIUserUtil.isSecondaryMUMDSystemUI() && (applicantDisplayId == Display.INVALID_DISPLAY || applicantDisplayId == Display.DEFAULT_DISPLAY)) {
+            Log.i("SystemUIOverlayWindowController", "attach failed, secondary MUMD displayId = " + mContext.getDisplayId() + ", applicantDisplayId = " + applicantDisplayId);
+            return;
+        }
+        mContext.updateDisplay(applicantDisplayId);
         if (mIsAttached) {
             return;
         }
