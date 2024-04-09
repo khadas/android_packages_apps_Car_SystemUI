@@ -124,7 +124,9 @@ public class VolumeUI implements CoreStartable {
             };
 
     private boolean mEnabled;
+    private Car mCar;
     private CarAudioManager mCarAudioManager;
+    private CarOccupantZoneManager mCarOccupantZoneManager;
     private VolumeDialogComponent mVolumeDialogComponent;
     private final Executor mExecutor;
 
@@ -144,6 +146,17 @@ public class VolumeUI implements CoreStartable {
         mExecutor = new HandlerExecutor(mainHandler);
     }
 
+    /**
+     * Listener to monitor any Occupant Zone configuration change.
+     */
+    private CarOccupantZoneManager.OccupantZoneConfigChangeListener mConfigChangeListener =
+        new CarOccupantZoneManager.OccupantZoneConfigChangeListener() {
+            @Override
+            public void onOccupantZoneConfigChanged(int changeFlags) {
+                obtainAudioZone();
+            }
+        };
+
     @Override
     public void start() {
         boolean enableVolumeUi = mResources.getBoolean(R.bool.enable_volume_ui);
@@ -151,34 +164,20 @@ public class VolumeUI implements CoreStartable {
         if (!mEnabled) return;
 
         mCarServiceProvider.addListener(car -> {
-            if (mCarAudioManager != null) {
+            mCar = car;
+            if (mCarOccupantZoneManager != null) {
                 return;
             }
 
-            CarOccupantZoneManager carOccupantZoneManager =
-                    (CarOccupantZoneManager) car.getCarManager(Car.CAR_OCCUPANT_ZONE_SERVICE);
-            if (carOccupantZoneManager != null) {
-                CarOccupantZoneManager.OccupantZoneInfo info =
-                        carOccupantZoneManager.getOccupantZoneForUser(mUserTracker.getUserHandle());
-                if (info != null) {
-                    mAudioZoneId = carOccupantZoneManager.getAudioZoneIdForOccupant(info);
-                }
-            }
-
-            if (mAudioZoneId == INVALID_AUDIO_ZONE) {
-                return;
-            }
-
-            mCarAudioManager = (CarAudioManager) car.getCarManager(Car.AUDIO_SERVICE);
-            if (mCarAudioManager.isAudioFeatureEnabled(AUDIO_FEATURE_VOLUME_GROUP_EVENTS)) {
-                Log.d(TAG, "Registering mCarVolumeGroupEventCallback.");
-                mCarAudioManager.registerCarVolumeGroupEventCallback(mExecutor,
-                        mCarVolumeGroupEventCallback);
+            mCarOccupantZoneManager =
+                    (CarOccupantZoneManager) mCar.getCarManager(Car.CAR_OCCUPANT_ZONE_SERVICE);
+            mCarAudioManager = (CarAudioManager) mCar.getCarManager(Car.AUDIO_SERVICE);
+            if (mCarOccupantZoneManager != null && mCarAudioManager != null) {
+                mCarOccupantZoneManager.registerOccupantZoneConfigChangeListener(
+                        mConfigChangeListener);
+                obtainAudioZone();
             } else {
-                Log.d(TAG, "Registering mVolumeChangeCallback.");
-                // This volume call back is never unregistered because CarStatusBar is
-                // never destroyed.
-                mCarAudioManager.registerCarVolumeCallback(mVolumeChangeCallback);
+                Log.w(TAG, "CarOccupantZoneManager or CarAudioManager not found, disabling volume ui.");
             }
         });
     }
@@ -210,9 +209,43 @@ public class VolumeUI implements CoreStartable {
     }
 
     private void unregistarCarAudioManagerCallbacks() {
-        mCarAudioManager.unregisterCarVolumeCallback(mVolumeChangeCallback);
-        if (mCarAudioManager.isAudioFeatureEnabled(AUDIO_FEATURE_VOLUME_GROUP_EVENTS)) {
-            mCarAudioManager.unregisterCarVolumeGroupEventCallback(mCarVolumeGroupEventCallback);
+        if (mCarAudioManager != null) {
+            mCarAudioManager.unregisterCarVolumeCallback(mVolumeChangeCallback);
+            if (mCarAudioManager.isAudioFeatureEnabled(AUDIO_FEATURE_VOLUME_GROUP_EVENTS)) {
+                mCarAudioManager.unregisterCarVolumeGroupEventCallback(mCarVolumeGroupEventCallback);
+            }
+        }
+    }
+
+    private void obtainAudioZone() {
+        if (mCarOccupantZoneManager == null) {
+            return;
+        }
+        CarOccupantZoneManager.OccupantZoneInfo info =
+                mCarOccupantZoneManager.getOccupantZoneForUser(mUserTracker.getUserHandle());
+        if (info != null) {
+            int newAudioZoneId = mCarOccupantZoneManager.getAudioZoneIdForOccupant(info);
+            if (newAudioZoneId == INVALID_AUDIO_ZONE) {
+                Log.i(TAG, "Now no AudioZone found for user, disabling volume ui and return!.");
+                return;
+            }
+            if (newAudioZoneId != mAudioZoneId) {
+                Log.i(TAG, "AudioZone(" + mAudioZoneId + ") changed to " + newAudioZoneId + ", re-registering callbacks.");
+                mAudioZoneId = newAudioZoneId;
+                unregistarCarAudioManagerCallbacks();
+            } else {
+                return;
+            }
+            if (mCarAudioManager.isAudioFeatureEnabled(AUDIO_FEATURE_VOLUME_GROUP_EVENTS)) {
+                Log.d(TAG, "Registering mCarVolumeGroupEventCallback.");
+                mCarAudioManager.registerCarVolumeGroupEventCallback(mExecutor,
+                        mCarVolumeGroupEventCallback);
+            } else {
+                Log.d(TAG, "Registering mVolumeChangeCallback.");
+                // This volume call back is never unregistered because CarStatusBar is
+                // never destroyed.
+                mCarAudioManager.registerCarVolumeCallback(mVolumeChangeCallback);
+            }
         }
     }
 }
